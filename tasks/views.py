@@ -21,7 +21,7 @@ class NewTaskForm(forms.Form):
     )
     description = forms.CharField(
         label='Description',
-        required=False,
+        required=True,
         widget=forms.Textarea(attrs={
             'placeholder': 'Optional description',
             'rows': 3
@@ -29,6 +29,7 @@ class NewTaskForm(forms.Form):
     )
     completed = forms.BooleanField(required=False)
     show_description = forms.BooleanField(initial=True)
+    priority = forms.BooleanField(required=False)
 
 # Index View - Home page showing task list
 @login_required(login_url="users:login")  # Ensure only logged-in users can access
@@ -55,10 +56,12 @@ def add(request):
             task_name = form.cleaned_data["task"]
             description = form.cleaned_data["description"]
             completed = form.cleaned_data["completed"]
+            priority = form.cleaned_data["priority"]
             Task.objects.create(
                 name=task_name,
                 description=description, 
                 completed=completed,
+                priority=priority,
                 user=request.user)  # Create a new Task object and save it in the database
             return HttpResponseRedirect(reverse("tasks:index"))
         else:
@@ -71,13 +74,13 @@ def add(request):
 
 # API View to Get a List of Tasks
 def get_tasks(request):
-    tasks = Task.objects.all().values("id", "name", "description", "completed")  # Get all tasks from the database
+    tasks = Task.objects.all().values("id", "name", "description", "completed", "priority")  # Get all tasks from the database
     return JsonResponse(list(tasks), safe=False)  # Return tasks as JSON
 
 # API View to Get a Specific Task
 def get_task(request, id):
     task = get_object_or_404(Task, id=id)  # Fetch a specific task by ID or return a 404 if not found
-    return JsonResponse({"id": task.id, "name": task.name, "description": task.description, "completed": task.completed})
+    return JsonResponse({"id": task.id, "name": task.name, "description": task.description, "completed": task.completed, "priority": task.priority})
 
 # API View to Create a New Task
 @csrf_exempt  # To allow POST requests without CSRF protection for the sake of API
@@ -100,9 +103,11 @@ def update_task(request, id):
         data = json.loads(request.body)
         task_name = data.get("name", task.name)  # Default to existing name if not provided
         completed = data.get("completed", task.completed)  # Default to existing completed status if not provided
+        priority = data.get("priority", task.priority)  # Default to existing priority status if not provided
         # Update task fields
         task.name = task_name
         task.completed = completed
+        task.priority = priority
         task.save()  # Save the updated task to the database
         return JsonResponse({
             "success": True,
